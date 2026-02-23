@@ -1,0 +1,11 @@
+# Local database and env
+data/
+.env
+.venv/
+*.db
+strokelink.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
