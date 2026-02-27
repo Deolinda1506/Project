@@ -1,4 +1,4 @@
-"""Scans and results CRUD (protected)."""
+"""Scans and results CRUD (protected). Images processed in-memory only (not stored permanently)."""
 from uuid import uuid4
 from typing import Annotated
 
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/scans", tags=["scans"])
 
 def _get_scan_or_404(scan_id: str, user_id: str, db: Session) -> Scan:
     scan = db.get(Scan, scan_id)
-    if not scan or scan.patient.user_id != user_id:
+    if not scan or scan.patient.user_id != user_id or scan.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scan not found")
     return scan
 
@@ -32,6 +32,7 @@ def create_scan(
     scan = Scan(
         id=str(uuid4()),
         patient_id=body.patient_id,
+        user_id=current_user.id,
         image_path=body.image_path,
     )
     db.add(scan)
@@ -46,7 +47,9 @@ def list_scans(
     db: Annotated[Session, Depends(get_db)] = ...,
     current_user: Annotated[User, Depends(get_current_user)] = ...,
 ):
-    q = db.query(Scan).join(Patient).filter(Patient.user_id == current_user.id)
+    q = db.query(Scan).join(Patient).filter(
+        (Patient.user_id == current_user.id) & (Scan.is_deleted == False)
+    )
     if patient_id:
         q = q.filter(Scan.patient_id == patient_id)
     return q.order_by(Scan.created_at.desc()).all()
@@ -67,8 +70,13 @@ def delete_scan(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
+    """Soft delete: Mark scan as deleted (data hidden but recoverable)."""
     scan = _get_scan_or_404(scan_id, current_user.id, db)
-    db.delete(scan)
+    
+    from datetime import datetime
+    scan.is_deleted = True
+    scan.deleted_at = datetime.utcnow()
+    
     db.commit()
     return None
 
@@ -88,6 +96,7 @@ def create_result(
         id=str(uuid4()),
         scan_id=body.scan_id,
         imt_mm=body.imt_mm,
+        risk_level=body.risk_level,
         is_high_risk=body.is_high_risk,
         model_version=body.model_version,
     )

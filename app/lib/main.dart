@@ -9,6 +9,11 @@ import 'bloc/scan_state.dart';
 import 'bloc/auth_bloc.dart';
 import 'bloc/auth_event.dart';
 import 'bloc/auth_state.dart';
+import 'screens/patient_history_screen.dart';
+import 'screens/hospital_map_screen.dart';
+import 'screens/notifications_screen.dart';
+import 'screens/sync_status_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() {
   runApp(const StrokeLinkApp());
@@ -62,6 +67,11 @@ class StrokeLinkApp extends StatelessWidget {
         TriageResultsScreen.routeName: (_) => const TriageResultsScreen(),
         ReferralScreen.routeName: (_) => const ReferralScreen(),
         ProfileScreen.routeName: (_) => const ProfileScreen(),
+        PatientHistoryScreen.routeName: (_) => const PatientHistoryScreen(),
+        HospitalMapScreen.routeName: (_) => const HospitalMapScreen(),
+        NotificationsScreen.routeName: (_) => const NotificationsScreen(),
+        SyncStatusScreen.routeName: (_) => const SyncStatusScreen(),
+        SettingsScreen.routeName: (_) => const SettingsScreen(),
       },
     ),
     );
@@ -634,6 +644,50 @@ class DashboardScreen extends StatelessWidget {
                           style: TextStyle(fontSize: 13, color: Colors.white70),
                         ),
                         const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _QuickActionTile(
+                                icon: Icons.camera_alt_outlined,
+                                label: 'Scan',
+                                onTap: () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    ScanCaptureScreen.routeName,
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _QuickActionTile(
+                                icon: Icons.image_outlined,
+                                label: 'Image',
+                                onTap: () async {
+                                  final picker = ImagePicker();
+                                  final XFile? file = await picker.pickImage(
+                                    source: ImageSource.gallery,
+                                    imageQuality: 90,
+                                  );
+                                  if (file != null && context.mounted) {
+                                    context.read<ScanBloc>().add(
+                                          ScanImageSelected(file.path),
+                                        );
+                                    Navigator.pushNamed(
+                                      context,
+                                      AnalysisScreen.routeName,
+                                    );
+                                  } else if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('No image selected.')),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
                         // Quick Actions card
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -676,6 +730,72 @@ class DashboardScreen extends StatelessWidget {
                                   );
                                 },
                                 icon: const Icon(Icons.camera_alt_outlined),
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0x1FFFFFFF),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.25),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'QUICK LINKS',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        letterSpacing: 1,
+                                        color: Colors.white70,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _QuickLinkButton(
+                                      icon: Icons.history,
+                                      label: 'Patient History',
+                                      onTap: () => Navigator.pushNamed(
+                                        context,
+                                        PatientHistoryScreen.routeName,
+                                      ),
+                                    ),
+                                    _QuickLinkButton(
+                                      icon: Icons.local_hospital_outlined,
+                                      label: 'Hospital Map',
+                                      onTap: () => Navigator.pushNamed(
+                                        context,
+                                        HospitalMapScreen.routeName,
+                                      ),
+                                    ),
+                                    _QuickLinkButton(
+                                      icon: Icons.notifications_none,
+                                      label: 'Notifications',
+                                      onTap: () => Navigator.pushNamed(
+                                        context,
+                                        NotificationsScreen.routeName,
+                                      ),
+                                    ),
+                                    _QuickLinkButton(
+                                      icon: Icons.sync_outlined,
+                                      label: 'Sync Status',
+                                      onTap: () => Navigator.pushNamed(
+                                        context,
+                                        SyncStatusScreen.routeName,
+                                      ),
+                                    ),
+                                    _QuickLinkButton(
+                                      icon: Icons.settings_outlined,
+                                      label: 'Settings',
+                                      onTap: () => Navigator.pushNamed(
+                                        context,
+                                        SettingsScreen.routeName,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                                 label: const Text(
                                   'Start New Scan',
                                   style: TextStyle(
@@ -833,6 +953,75 @@ class _DashboardStatTile extends StatelessWidget {
   }
 }
 
+class _QuickActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: Colors.white, size: 22),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickLinkButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickLinkButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: Colors.white),
+      title: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 13),
+      ),
+      trailing: const Icon(Icons.chevron_right, color: Colors.white70),
+      onTap: onTap,
+    );
+  }
+}
+
 // Screen 2 – Real-time Scanning / Image Capture
 class ScanCaptureScreen extends StatefulWidget {
   static const routeName = '/scan-capture';
@@ -863,6 +1052,22 @@ class _ScanCaptureScreenState extends State<ScanCaptureScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No image captured.')),
+      );
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    final XFile? file = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
+    );
+    if (!mounted) return;
+    if (file != null) {
+      context.read<ScanBloc>().add(ScanImageSelected(file.path));
+      Navigator.pushNamed(context, AnalysisScreen.routeName);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No image selected.')),
       );
     }
   }
@@ -1009,6 +1214,22 @@ class _ScanCaptureScreenState extends State<ScanCaptureScreen> {
                     shape: BoxShape.circle,
                   ),
                 ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: SizedBox(
+              width: 220,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white54),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                onPressed: _pickFromGallery,
+                icon: const Icon(Icons.image_outlined, size: 18),
+                label: const Text('Upload Image'),
               ),
             ),
           ),

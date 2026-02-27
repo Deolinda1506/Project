@@ -15,7 +15,7 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 
 def _get_patient_or_404(patient_id: str, user_id: str, db: Session) -> Patient:
     patient = db.get(Patient, patient_id)
-    if not patient or patient.user_id != user_id:
+    if not patient or patient.user_id != user_id or patient.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     return patient
 
@@ -43,7 +43,10 @@ def list_patients(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    return db.query(Patient).filter(Patient.user_id == current_user.id).all()
+    # Only return non-deleted patients
+    return db.query(Patient).filter(
+        (Patient.user_id == current_user.id) & (Patient.is_deleted == False)
+    ).all()
 
 
 @router.get("/{patient_id}", response_model=PatientResponse)
@@ -78,7 +81,17 @@ def delete_patient(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
+    """Soft delete: Mark patient as deleted (data hidden but recoverable)."""
     patient = _get_patient_or_404(patient_id, current_user.id, db)
-    db.delete(patient)
+    
+    from datetime import datetime
+    patient.is_deleted = True
+    patient.deleted_at = datetime.utcnow()
+    
+    # Mark all associated scans as deleted
+    for scan in patient.scans:
+        scan.is_deleted = True
+        scan.deleted_at = datetime.utcnow()
+    
     db.commit()
     return None

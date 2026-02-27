@@ -1,52 +1,42 @@
-"""JWT create/verify and get_current_user dependency."""
-from datetime import datetime, timezone, timedelta
+"""Firebase token verification and get_current_user dependency."""
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from backend.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from backend.database import get_db
 from backend.models import User
+from backend.firebase_config import verify_firebase_token
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
-
-
-def create_access_token(sub: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": sub, "exp": expire, "type": "access"}
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
-
-def decode_token(token: str) -> dict | None:
-    try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError:
-        return None
+security = HTTPBearer()
 
 
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     db: Annotated[Session, Depends(get_db)],
 ) -> User:
+    """
+    Verify Firebase ID token and return the corresponding user.
+    Client must send: Authorization: Bearer <firebase_id_token>
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired token",
+        detail="Invalid or expired Firebase token",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    try:
+        firebase_uid = verify_firebase_token(credentials.credentials)
+    except Exception:
+        raise credentials_exception
+    
+    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+    if not user or user.is_deleted:
+        raise credentials_exception
+    
+    return user
+
     payload = decode_token(token)
     if payload is None or payload.get("type") != "access":
         raise credentials_exception
